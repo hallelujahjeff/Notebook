@@ -11,6 +11,7 @@ void USkeletalMeshComponent::SetAllBodiesBelowSimulatePhysics( const FName& InBo
 {
 	int32 NumBodiesFound = ForEachBodyBelow(InBoneName, bIncludeSelf, /*bSkipCustomPhysicsType=*/ false, [bNewSimulate](FBodyInstance* BI)
 	{
+		
 		BI->SetInstanceSimulatePhysics(bNewSimulate);
 	});
 ...
