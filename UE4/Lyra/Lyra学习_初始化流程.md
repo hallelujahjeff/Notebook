@@ -72,3 +72,45 @@ Lyra使用EnhancedInputSystem来处理玩家的输入逻辑，可以认为是UE4
 	LyraIC->BindNativeAction(InputConfig, LyraGameplayTags::InputTag_Crouch, ETriggerEvent::Triggered, this, &ThisClass::Input_Crouch, /*bLogIfNotFound=*/ false);
 	LyraIC->BindNativeAction(InputConfig, LyraGameplayTags::InputTag_AutoRun, ETriggerEvent::Triggered, this, &ThisClass::Input_AutoRun, /*bLogIfNotFound=*/ false);
 ```
+
+### 让角色动起来
+查看Lyra的主角B_Hero_ShooterMannequin可以发现，它的Mesh是不可见的。
+![](./Image/2025-07-28-23-38-14.png)
+这是因为Lyra将角色与角色对应的Mesh做了解耦，角色的动画状态机只跑逻辑，而输出的Pose会通过一个CopyPose的方式，复制给角色下方挂接的B_Manny或B_Quinn。 具体为什么这么做在后面动画部分可以更详细的分析。
+![](./Image/2025-07-28-23-40-31.png)
+所以为了让角色动起来，我们需要在角色初始化后创建B_Manny，这是通过角色身上的PawnCosmeticsComponent组件来实现的。
+首先，在Experience蓝图中配置了随机选择主控角色Mesh的逻辑：
+![](./Image/2025-07-28-23-43-08.png)
+![](./Image/2025-07-28-23-46-45.png)
+实际是访问了Controller身上的`LyraControllerComponentCharacterParts`组件，这个组件在C++中通过角色身上的`ULyraPawnComponent_CharacterParts`组件来为角色身上加Mesh，在这里将B_Manny或B_Quinn加上去了
+
+```cpp
+ULyraPawnComponent_CharacterParts* ULyraControllerComponent_CharacterParts::GetPawnCustomizer() const
+{
+	if (APawn* ControlledPawn = GetPawn<APawn>())
+	{
+		return ControlledPawn->FindComponentByClass<ULyraPawnComponent_CharacterParts>();
+	}
+	return nullptr;
+}
+
+void ULyraControllerComponent_CharacterParts::AddCharacterPartInternal(const FLyraCharacterPart& NewPart, ECharacterPartSource Source)
+{
+	FLyraControllerCharacterPartEntry& NewEntry = CharacterParts.AddDefaulted_GetRef();
+	NewEntry.Part = NewPart;
+	NewEntry.Source = Source;
+
+	if (ULyraPawnComponent_CharacterParts* PawnCustomizer = GetPawnCustomizer())
+	{
+		if (NewEntry.Source != ECharacterPartSource::NaturalSuppressedViaCheat)
+		{
+			NewEntry.Handle = PawnCustomizer->AddCharacterPart(NewPart);
+		}
+	}
+
+}
+```
+
+但此时角色依然没有动画，因为Lyra中角色的主状态机只有逻辑，没有具体的动画资产。 实际的动画资产要通过将装备（比如手枪）装备到角色身上时，调用武器类上的ActivateAnimLayerAndPlayPairedAnim来实现
+![](./Image/2025-07-28-23-51-16.png)
+可以看到实际需要调用的是LinkAnimClassLayers，这一步会将武器包含的动画蓝图连接角色动画蓝图上，至此角色动画蓝图才能够正常运作。
