@@ -83,4 +83,37 @@ enum class EGameplayEffectMagnitudeCalculation : uint8
 ```
 
 ### Duration类型应用Modifier
-TODO
+Duration类型GE分为两种：Period 为0的非Dot型GE，和根据Period时间触发的Dot型GE，二者触发方式也有所区别.
+
+GE被添加后，在GE进行一系列Tag判断后，进入`FActiveGameplayEffect::CheckOngoingTagRequirements`函数，如果GE需要激活，则进入`AddActiveGameplayEffectGrantedTagsAndModifiers`来生效这个GE带来的Modifier和Tag；如果GE失效，则调用`RemoveActiveGameplayEffectGrantedTagsAndModifiers`
+
+在`AddActiveGameplayEffectGrantedTagsAndModifiers`内部，会进行一次Period的判断，来决定是直接生效还是注册定时器:
+```cpp
+// Register this ActiveGameplayEffects modifiers with our Attribute Aggregators
+	if (Effect.Spec.GetPeriod() <= UGameplayEffect::NO_PERIOD)
+	{
+		for (int32 ModIdx = 0; ModIdx < Effect.Spec.Modifiers.Num(); ++ModIdx)
+		{
+			// ...
+
+			FAggregator* Aggregator = FindOrCreateAttributeAggregator(Effect.Spec.Def->Modifiers[ModIdx].Attribute).Get();
+			if (ensure(Aggregator))
+			{
+				Aggregator->AddAggregatorMod(EvaluatedMagnitude, ModInfo.ModifierOp, ModInfo.EvaluationChannelSettings.GetEvaluationChannel(), &ModInfo.SourceTags, &ModInfo.TargetTags, Effect.PredictionKey.WasLocallyGenerated(), Effect.Handle);
+			}
+		}
+	}
+	else
+	{
+		if (Effect.Spec.Def->PeriodicInhibitionPolicy != EGameplayEffectPeriodInhibitionRemovedPolicy::NeverReset && Owner && Owner->IsOwnerActorAuthoritative())
+		{
+			// ...
+			TimerManager.SetTimer(Effect.PeriodHandle, Delegate, Effect.Spec.GetPeriod(), true);
+		}
+	}
+```
+
+值得注意的是对于Modifier的处理，Duration使用FAggregator属性聚合器，将一个GE施加的Modifier聚合在一起，并将其标为Dirty. 遍历完所有Modifier后，触发一个Aggregator的更新.
+
+而对于Period大于0的GE，在注册定时器后，会定期执行`ExecuteActiveEffectsFrom`，那就和上面Instant类型的GE一样了
+
