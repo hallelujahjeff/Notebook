@@ -62,6 +62,7 @@ Lyra使用EnhancedInputSystem来处理玩家的输入逻辑，可以认为是UE4
 				Subsystem->AddPlayerMappableConfig(Pair.Config.LoadSynchronous(), Options);	
 			}
 		}
+	}
 ```
 
 2. 通过`BindAction`，将输入产生的InputAction与实际逻辑绑定起来

@@ -30,7 +30,7 @@ void UAbilitySystemComponent::ExecuteGameplayEffect(FGameplayEffectSpec &Spec, F
 1. 执行CalculateModifierMagnitudes，预计算Modifier所要施加的数值
 2. 遍历每一个Modifer，调用`InternalExecuteMod`来走内部应用逻辑
 3. 执行`ApplyModToAttribute`，根据操作类型，将Modifier的计算值施加到AttributeSet中
-对于Instant类型的GE，属性修正没有乘区的概念，加和乘都是应用在属性的当前值上的
+对于Instant类型的GE，属性修正没有乘区的概念，加和乘都是应用在属性的Base上的
 ```cpp
 float FAggregator::StaticExecModOnBaseValue(float BaseValue, TEnumAsByte<EGameplayModOp::Type> ModifierOp, float EvaluatedMagnitude)
 {
